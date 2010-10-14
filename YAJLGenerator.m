@@ -23,72 +23,246 @@
 //------------------------------------------------------------------------------
 
 #import "YAJLGenerator.h"
+#import "YAJLErrorDomain.h"
+
+@interface YAJLGenerator(Private)
+
+/*!
+ * Constructs the generator implementation lazily. Reason for the laziness: it
+ * lets you set up the indent string and beautify flag prior to use. Once you
+ * start using the generator however, these configuration items become
+ * hardwired.
+ */
+- (struct yajl_gen_t *)gen;
+
+@end
 
 @implementation YAJLGenerator
 
-- (id)init
-{
-	self = [super init];
-	if (self)
-	{
-		gen = yajl_gen_alloc(NULL, NULL);
-	}
-	return self;
-}
-
 - (void)dealloc
 {
-	yajl_gen_free(gen);
+	if (gen)
+	{
+		yajl_gen_free(gen);
+	}
+	free(indentUTF8String);
 	[super dealloc];
 }
 
-- (yajl_gen_status)generateInteger:(NSInteger)number
+//------------------------------------------------------------------------------
+#pragma mark                                     indent string and beautify flag
+//------------------------------------------------------------------------------
+
+- (NSString *)indentString
 {
-	return yajl_gen_integer(gen, number);
+	return [NSString stringWithUTF8String:indentUTF8String];
 }
 
-- (yajl_gen_status)generateDouble:(double_t)number
+/*!
+ * Do not alter the indent string if the generator exists. You can only alter
+ * the configuration items prior to use. Set up the generator first, then use
+ * it. When you start to use the generator, set-up methods become no-operations.
+ */
+- (void)setIndentString:(NSString *)string
 {
-	return yajl_gen_double(gen, number);
+	if (gen == NULL)
+	{
+		free(indentUTF8String);
+		indentUTF8String = strdup([string UTF8String]);
+	}
 }
 
-- (yajl_gen_status)generateString:(NSString *)string
+- (BOOL)beautify
 {
-	const char *utf8String = [string UTF8String];
-	return yajl_gen_string(gen, (const unsigned char *)utf8String, strlen(utf8String));
+	return genConfigFlags.beautify;
 }
 
-- (yajl_gen_status)generateNull
+- (void)setBeautify:(BOOL)yesOrNo
 {
-	return yajl_gen_null(gen);
+	genConfigFlags.beautify = yesOrNo;
 }
 
-- (yajl_gen_status)generateBool:(BOOL)yesOrNo
+//------------------------------------------------------------------------------
+#pragma mark                                                          generators
+//------------------------------------------------------------------------------
+
+/*!
+ * Handles YAJL status; answers with YES or NO, and generates an error if
+ * NO. All the generator methods answer YES on success, NO on failure. If they
+ * fail and you supply a pointer to an NSError pointer equal to nil, the
+ * generator methods create a new error. The error code equals the generator
+ * status, a non-zero value.
+ */
+static BOOL YAJLGenerateError(yajl_gen_status status, NSError **outError)
 {
-	return yajl_gen_bool(gen, yesOrNo);
+	BOOL yes = status == yajl_gen_status_ok;
+	if (!yes && outError && *outError == nil)
+	{
+		*outError = [NSError errorWithDomain:YAJLErrorDomain code:status userInfo:nil];
+	}
+	return yes;
 }
 
-- (yajl_gen_status)generateObject:(id)object
+- (BOOL)generateInteger:(long)number error:(NSError **)outError
 {
-	yajl_gen_status status;
+	return YAJLGenerateError(yajl_gen_integer([self gen], number), outError);
+}
+
+- (BOOL)generateDouble:(double)number error:(NSError **)outError
+{
+	return YAJLGenerateError(yajl_gen_double([self gen], number), outError);
+}
+
+- (BOOL)generateString:(NSString *)string error:(NSError **)outError
+{
+	const char *UTF8String = [string UTF8String];
+	return YAJLGenerateError(yajl_gen_string([self gen], (const unsigned char *)UTF8String, strlen(UTF8String)), outError);
+}
+
+- (BOOL)generateNullWithError:(NSError **)outError
+{
+	return YAJLGenerateError(yajl_gen_null([self gen]), outError);
+}
+
+- (BOOL)generateBool:(BOOL)yesOrNo error:(NSError **)outError
+{
+	return YAJLGenerateError(yajl_gen_bool([self gen], yesOrNo), outError);
+}
+
+- (BOOL)generateMap:(NSDictionary *)dictionary error:(NSError **)outError
+{
+	BOOL yes = YAJLGenerateError(yajl_gen_map_open([self gen]), outError);
+	if (yes)
+	{
+		for (id key in dictionary)
+		{
+			yes = [self generateObject:key error:outError];
+			if (!yes) return yes;
+			
+			yes = [self generateObject:[dictionary objectForKey:key] error:outError];
+			if (!yes) return yes;
+		}
+		yes = YAJLGenerateError(yajl_gen_map_close([self gen]), outError);
+	}
+	return yes;
+}
+
+- (BOOL)generateArray:(NSArray *)array error:(NSError **)outError
+{
+	BOOL yes = YAJLGenerateError(yajl_gen_array_open([self gen]), outError);
+	if (yes)
+	{
+		for (id element in array)
+		{
+			yes = [self generateObject:element error:outError];
+			if (!yes) return yes;
+		}
+		yes = YAJLGenerateError(yajl_gen_array_close([self gen]), outError);
+	}
+	return yes;
+}
+
+- (BOOL)generateObject:(id)object error:(NSError **)outError
+{
+	BOOL yes;
 	if (object == nil || [object isKindOfClass:[NSNull class]])
 	{
-		status = [self generateNull];
+		yes = [self generateNullWithError:outError];
+	}
+	else if ([object isKindOfClass:[NSNumber class]])
+	{
+		const char *objCType = [object objCType];
+		// Fold all the integer formats available for NSNumber to a plain
+		// integer, a signed integer or to be more specific a signed long. Long
+		// is the basic type accepted by the underlying implementation. Unsigned
+		// values greater than LONG_MAX become type cast to the equivalent
+		// signed value. Values with wider bit-width than long become
+		// truncated. This includes long long and possibly NSInteger depending
+		// on architecture.
+		static const char *integerEncodings[] =
+		{
+			// signed
+			@encode(char),
+			@encode(short),
+			@encode(int),
+			@encode(long),
+			@encode(long long),
+			// unsigned
+			@encode(unsigned char),
+			@encode(unsigned short),
+			@encode(unsigned int),
+			@encode(unsigned long),
+			@encode(unsigned long long),
+		};
+#define DIMOF(array) (sizeof(array)/sizeof((array)[0]))
+		NSUInteger i;
+		for (i = 0; i < DIMOF(integerEncodings) && strcmp(objCType, integerEncodings[i]); i++);
+		if (i < DIMOF(integerEncodings))
+		{
+			yes = [self generateInteger:[object longValue] error:outError];
+		}
+		else if (strcmp(objCType, @encode(double)) == 0 || strcmp(objCType, @encode(float)) == 0)
+		{
+			yes = [self generateDouble:[object doubleValue] error:outError];
+		}
+		else if (strcmp(objCType, @encode(BOOL)) == 0)
+		{
+			yes = [self generateBool:[object boolValue] error:outError];
+		}
+	}
+	else if ([object isKindOfClass:[NSString class]])
+	{
+		yes = [self generateString:object error:outError];
+	}
+	else if ([object isKindOfClass:[NSDictionary class]])
+	{
+		yes = [self generateMap:object error:outError];
 	}
 	else if ([object isKindOfClass:[NSArray class]])
 	{
-		yajl_gen_array_open(gen);
-		for (id element in object)
-		{
-			[self generateObject:element];
-		}
-		yajl_gen_array_close(gen);
+		yes = [self generateArray:object error:outError];
 	}
 	else
 	{
-		status = yajl_gen_status_ok;
+		yes = NO;
 	}
-	return status;
+	return yes;
+}
+
+//------------------------------------------------------------------------------
+#pragma mark                                                              buffer
+//------------------------------------------------------------------------------
+
+- (NSString *)bufferWithError:(NSError **)outError
+{
+	NSString *string;
+	const unsigned char *buf;
+	unsigned int len;
+	if (YAJLGenerateError(yajl_gen_get_buf(gen, &buf, &len), outError))
+	{
+		string = [NSString stringWithUTF8String:(const char *)buf];
+	}
+	else
+	{
+		string = nil;
+	}
+	return string;
+}
+
+@end
+
+@implementation YAJLGenerator(Private)
+
+- (struct yajl_gen_t *)gen
+{
+	if (gen == NULL)
+	{
+		yajl_gen_config config;
+		config.beautify = genConfigFlags.beautify;
+		config.indentString = indentUTF8String;
+		gen = yajl_gen_alloc(&config, NULL);
+	}
+	return gen;
 }
 
 @end

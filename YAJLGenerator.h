@@ -29,17 +29,33 @@
 @interface YAJLGenerator : NSObject
 {
 	struct yajl_gen_t *gen;
+	char *indentUTF8String;
+	struct
+	{
+		NSUInteger beautify:1;
+	}
+	genConfigFlags;
 }
 
-//	integer
-//	double
+//---------------------------------------------- indent string and beautify flag
 
-- (yajl_gen_status)generateInteger:(NSInteger)number;
-- (yajl_gen_status)generateDouble:(double_t)number;
-- (yajl_gen_status)generateString:(NSString *)string;
-- (yajl_gen_status)generateNull;
-- (yajl_gen_status)generateBool:(BOOL)yesOrNo;
+@property(copy) NSString *indentString;
+@property(assign) BOOL beautify;
 
-- (yajl_gen_status)generateObject:(id)object;
+//------------------------------------------------------------------- generators
+
+// Things to note: the interface uses the term "map" for dictionaries. In this context, they are the same thing. JSON maps amount to NextStep dictionaries.
+
+- (BOOL)generateInteger:(long)number error:(NSError **)outError;
+- (BOOL)generateDouble:(double)number error:(NSError **)outError;
+- (BOOL)generateString:(NSString *)string error:(NSError **)outError;
+- (BOOL)generateNullWithError:(NSError **)outError;
+- (BOOL)generateBool:(BOOL)yesOrNo error:(NSError **)outError;
+
+- (BOOL)generateObject:(id)object error:(NSError **)outError;
+
+//----------------------------------------------------------------------- buffer
+
+- (NSString *)bufferWithError:(NSError **)outError;
 
 @end

@@ -24,14 +24,24 @@
 
 #import <Foundation/Foundation.h>
 
+#import <YAJL/yajl_parse.h>
+
 @interface YAJLParser : NSObject
 {
+	struct yajl_handle_t *handle;
 	struct
 	{
 		NSUInteger allowComments:1;
 		NSUInteger checkUTF8:1;
 	}
 	parserConfigFlags;
+	NSMutableArray *stack;
+	id rootObject;
 }
+
+@property(retain) id rootObject;
+
+- (BOOL)parseString:(NSString *)string error:(NSError **)outError;
+- (BOOL)parseCompleteWithError:(NSError **)outError;
 
 @end
