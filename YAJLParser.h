@@ -39,12 +39,33 @@
 	id rootObject;
 }
 
+//----------------------------------------- allow comments and check UTF-8 flags
+
 @property(NS_NONATOMIC_IPHONEONLY) BOOL allowComments;
 @property(NS_NONATOMIC_IPHONEONLY) BOOL checkUTF8;
 
+//---------------------------------------------------------------------- parsing
+
+/*!
+ * Accesses the root object, typically after parsing completes. Note that the
+ * root object can be a non-aggregate type (null, a boolean, an integer, a
+ * double or a string) as well as a map or an array. The root of the parsed JSON
+ * text does not necessarily specify a collection of objects.
+ */
 @property(retain, NS_NONATOMIC_IPHONEONLY) id rootObject;
 
+/*!
+ * Sends JSON text strings to the parser. You can send this message multiple
+ * times, such as when you read incoming JSON partially in blocks through an
+ * Internet connection or from files via a read buffer. However, in those cases,
+ * using -parseData:error: will prove wiser because UTF-8 encodings may not
+ * always align against buffer boundaries. Parsing data rather than strings
+ * correctly realigns the multi-byte character codes. Be advised therefore,
+ * converting buffered subsections of the data to UTF-8 may throw up some
+ * decoding problems.
+ */
 - (BOOL)parseString:(NSString *)string error:(NSError **)outError;
+- (BOOL)parseData:(NSData *)data error:(NSError **)outError;
 - (BOOL)parseCompleteWithError:(NSError **)outError;
 
 @end

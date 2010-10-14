@@ -52,7 +52,7 @@
 @implementation YAJLParser
 
 //------------------------------------------------------------------------------
-#pragma mark                                 allow comments and check UTF8 flags
+#pragma mark                                allow comments and check UTF-8 flags
 //------------------------------------------------------------------------------
 
 - (BOOL)allowComments
@@ -113,6 +113,11 @@ static BOOL YAJLParseError(yajl_status status, NSError **outError)
 	const char *UTF8String = [string UTF8String];
 	size_t length = strlen(UTF8String);
 	return YAJLParseError(yajl_parse([self handle], (const unsigned char *)UTF8String, length), outError);
+}
+
+- (BOOL)parseData:(NSData *)data error:(NSError **)outError
+{
+	return YAJLParseError(yajl_parse([self handle], [data bytes], [data length]), outError);
 }
 
 - (BOOL)parseCompleteWithError:(NSError **)outError
