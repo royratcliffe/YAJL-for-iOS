@@ -39,8 +39,8 @@
 
 //---------------------------------------------- indent string and beautify flag
 
-@property(copy) NSString *indentString;
-@property(assign) BOOL beautify;
+@property(copy, NS_NONATOMIC_IPHONEONLY) NSString *indentString;
+@property(NS_NONATOMIC_IPHONEONLY) BOOL beautify;
 
 //------------------------------------------------------------------- generators
 

@@ -51,6 +51,10 @@
 
 @implementation YAJLParser
 
+//------------------------------------------------------------------------------
+#pragma mark                                 allow comments and check UTF8 flags
+//------------------------------------------------------------------------------
+
 - (BOOL)allowComments
 {
 	return parserConfigFlags.allowComments;
@@ -71,11 +75,21 @@
 	parserConfigFlags.checkUTF8 = flag;
 }
 
+//------------------------------------------------------------------------------
+#pragma mark                                                             parsing
+//------------------------------------------------------------------------------
+
 @synthesize rootObject;
 
 - (void)dealloc
 {
+	// Releasing the parser does not release the root object. You may want to
+	// continue using the root object after you no longer need the parser. That
+	// would be normal. So, rather than release, just set the root-object
+	// property to nil. In effect, nil'ing auto-releases the root object. It
+	// will de-allocate when the enclosing auto-release pool flushes.
 	[self setRootObject:nil];
+	
 	if (handle)
 	{
 		yajl_free(handle);
@@ -107,6 +121,10 @@ static BOOL YAJLParseError(yajl_status status, NSError **outError)
 }
 
 @end
+
+//------------------------------------------------------------------------------
+#pragma mark                                                           callbacks
+//------------------------------------------------------------------------------
 
 static int YAJLNull(void *context)
 {

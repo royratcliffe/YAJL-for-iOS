@@ -39,10 +39,10 @@
 	id rootObject;
 }
 
-@property BOOL allowComments;
-@property BOOL checkUTF8;
+@property(NS_NONATOMIC_IPHONEONLY) BOOL allowComments;
+@property(NS_NONATOMIC_IPHONEONLY) BOOL checkUTF8;
 
-@property(retain) id rootObject;
+@property(retain, NS_NONATOMIC_IPHONEONLY) id rootObject;
 
 - (BOOL)parseString:(NSString *)string error:(NSError **)outError;
 - (BOOL)parseCompleteWithError:(NSError **)outError;
