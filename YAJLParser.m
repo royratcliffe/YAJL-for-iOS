@@ -51,6 +51,26 @@
 
 @implementation YAJLParser
 
+- (BOOL)allowComments
+{
+	return parserConfigFlags.allowComments;
+}
+
+- (BOOL)checkUTF8
+{
+	return parserConfigFlags.checkUTF8;
+}
+
+- (void)setAllowComments:(BOOL)flag
+{
+	parserConfigFlags.allowComments = flag;
+}
+
+- (void)setCheckUTF8:(BOOL)flag
+{
+	parserConfigFlags.checkUTF8 = flag;
+}
+
 @synthesize rootObject;
 
 - (void)dealloc

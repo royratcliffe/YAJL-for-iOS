@@ -39,6 +39,9 @@
 	id rootObject;
 }
 
+@property BOOL allowComments;
+@property BOOL checkUTF8;
+
 @property(retain) id rootObject;
 
 - (BOOL)parseString:(NSString *)string error:(NSError **)outError;
