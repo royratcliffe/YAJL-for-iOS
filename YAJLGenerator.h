@@ -44,13 +44,16 @@
 
 //------------------------------------------------------------------- generators
 
-// Things to note: the interface uses the term "map" for dictionaries. In this context, they are the same thing. JSON maps amount to NextStep dictionaries.
+// Things to note: the interface uses the term "map" for dictionaries. In this
+// context, they are the same thing. JSON maps amount to NextStep dictionaries.
 
 - (BOOL)generateInteger:(long)number error:(NSError **)outError;
 - (BOOL)generateDouble:(double)number error:(NSError **)outError;
 - (BOOL)generateString:(NSString *)string error:(NSError **)outError;
 - (BOOL)generateNullWithError:(NSError **)outError;
 - (BOOL)generateBool:(BOOL)yesOrNo error:(NSError **)outError;
+- (BOOL)generateMap:(NSDictionary *)dictionary error:(NSError **)outError;
+- (BOOL)generateArray:(NSArray *)array error:(NSError **)outError;
 
 - (BOOL)generateObject:(id)object error:(NSError **)outError;
 
